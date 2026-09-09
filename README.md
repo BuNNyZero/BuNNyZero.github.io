@@ -4,16 +4,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Flying Sword - Three.js</title>
+    <title>3D Flying Cat - Three.js</title>
     <style>
-        /* บังคับให้แสดงผลเต็มหน้าจอ 100% */
         html, body {
             width: 100%;
             height: 100%;
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background-color: #05050d;
+            background-color: #0b091a;
             font-family: sans-serif;
         }
 
@@ -26,22 +25,21 @@
             left: 0;
         }
 
-        /* ข้อความแนะนำวิธีเล่น */
         .instructions {
             position: absolute;
             bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
-            color: rgba(255, 255, 255, 0.7);
+            color: rgba(255, 255, 255, 0.85);
             font-size: 14px;
             pointer-events: none;
             user-select: none;
             text-align: center;
-            background: rgba(0, 0, 0, 0.5);
-            padding: 8px 16px;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 8px 18px;
             border-radius: 20px;
-            backdrop-filter: blur(4px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
         }
     </style>
     <!-- Import Map สำหรับ Three.js -->
@@ -59,7 +57,7 @@
     <canvas id="webgl-canvas"></canvas>
     
     <div class="instructions">
-        🖱️ คลิกซ้ายลากเพื่อหมุนกล้อง | คลิกขวาเพื่อเลื่อน | สโครลเพื่อซูม | คลิกที่กระบี่เพื่อปล่อยพลัง!
+        🐾 คลิกซ้ายลากเพื่อหมุน | สโครลเพื่อซูม | คลิกที่ตัวน้องแมวเพื่อเพิ่มความเร็ว!
     </div>
 
     <script type="module">
@@ -69,7 +67,7 @@
         // 1. Scene Setup
         const canvas = document.querySelector('#webgl-canvas');
         const scene = new THREE.Scene();
-        scene.fog = new THREE.FogExp2(0x05050d, 0.03); // หมอกเพิ่มบรรยากาศแฟนตาซี
+        scene.fog = new THREE.FogExp2(0x0b091a, 0.025);
 
         // 2. Camera Setup
         const camera = new THREE.PerspectiveCamera(
@@ -78,7 +76,7 @@
             0.1, 
             1000
         );
-        camera.position.set(0, 3, 10);
+        camera.position.set(0, 3, 9);
 
         // 3. Renderer Setup
         const renderer = new THREE.WebGLRenderer({
@@ -87,7 +85,6 @@
         });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        renderer.shadowMap.enabled = true;
 
         // 4. OrbitControls
         const controls = new OrbitControls(camera, renderer.domElement);
@@ -95,140 +92,176 @@
         controls.dampingFactor = 0.05;
 
         // 5. Lighting Setup
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
         scene.add(ambientLight);
 
-        const mainLight = new THREE.DirectionalLight(0x90e0ef, 2.5);
-        mainLight.position.set(5, 10, 7);
+        const mainLight = new THREE.DirectionalLight(0xffb703, 2);
+        mainLight.position.set(5, 8, 5);
         scene.add(mainLight);
 
-        // แสงสว่างสีฟ้าปล่อยออกจากกระบี่ (Glow Light)
-        const swordLight = new THREE.PointLight(0x00f0ff, 3, 8);
-        scene.add(swordLight);
+        const catLight = new THREE.PointLight(0xffaa00, 3, 7);
+        scene.add(catLight);
 
-        // 6. ฟังก์ชันสร้างโมเดลกระบี่ 3D (Procedural Chinese Flying Sword)
-        function createSword() {
-            const swordGroup = new THREE.Group();
+        // 6. ฟังก์ชันสร้างโมเดลน้องแมว 3D (Procedural 3D Flying Cat)
+        let tailMesh; // สำหรับสบัดหาง
+        function createCat() {
+            const catGroup = new THREE.Group();
 
-            // วัสดุ (Materials)
-            const bladeMaterial = new THREE.MeshStandardMaterial({
-                color: 0xe0e0e0,
-                metalness: 0.95,
-                roughness: 0.1,
+            // Materials
+            const furMaterial = new THREE.MeshStandardMaterial({
+                color: 0x3a3a42, // แมวสีเทาเข้ม
+                roughness: 0.8,
+            });
+            const innerEarMaterial = new THREE.MeshStandardMaterial({
+                color: 0xffb3c1,
+                roughness: 0.5
+            });
+            const eyeMaterial = new THREE.MeshBasicMaterial({
+                color: 0x00ffcc // ตาเรืองแสงสีเขียวฟ้า
+            });
+            const noseMaterial = new THREE.MeshStandardMaterial({
+                color: 0xff8fa3,
+                roughness: 0.3
             });
 
-            const goldMaterial = new THREE.MeshStandardMaterial({
-                color: 0xffd700,
-                metalness: 0.8,
-                roughness: 0.2,
-            });
+            // 6.1 ลำตัว (Body)
+            const bodyGeo = new THREE.SphereGeometry(0.8, 32, 16);
+            bodyGeo.scale(1, 0.8, 1.4); // ยืดให้กลายเป็นทรงแคปซูล
+            const body = new THREE.Mesh(bodyGeo, furMaterial);
+            catGroup.add(body);
 
-            const handleMaterial = new THREE.MeshStandardMaterial({
-                color: 0x4a0e17,
-                roughness: 0.6,
-            });
+            // 6.2 หัว (Head)
+            const headGeo = new THREE.SphereGeometry(0.65, 32, 16);
+            headGeo.scale(1.1, 0.95, 1);
+            const head = new THREE.Mesh(headGeo, furMaterial);
+            head.position.set(0, 0.4, 0.9);
+            catGroup.add(head);
 
-            // 6.1 ตัวคมกระบี่ (Blade)
-            const bladeShape = new THREE.Shape();
-            bladeShape.moveTo(0, 0);
-            bladeShape.lineTo(0.12, 0.1);
-            bladeShape.lineTo(0.08, 3.5);
-            bladeShape.lineTo(0, 4.0); // ปลายแหลม
-            bladeShape.lineTo(-0.08, 3.5);
-            bladeShape.lineTo(-0.12, 0.1);
-            bladeShape.closePath();
+            // 6.3 หูแมว (Ears)
+            const earGeo = new THREE.ConeGeometry(0.22, 0.4, 16);
+            
+            const leftEar = new THREE.Mesh(earGeo, furMaterial);
+            leftEar.position.set(0.32, 0.95, 0.85);
+            leftEar.rotation.set(-0.2, 0, -0.2);
+            catGroup.add(leftEar);
 
-            const extrudeSettings = {
-                depth: 0.03,
-                bevelEnabled: true,
-                bevelSegments: 2,
-                steps: 1,
-                bevelSize: 0.02,
-                bevelThickness: 0.02
-            };
+            const rightEar = leftEar.clone();
+            rightEar.position.x = -0.32;
+            rightEar.rotation.z = 0.2;
+            catGroup.add(rightEar);
 
-            const bladeGeo = new THREE.ExtrudeGeometry(bladeShape, extrudeSettings);
-            bladeGeo.center();
-            const blade = new THREE.Mesh(bladeGeo, bladeMaterial);
-            blade.position.y = 2.0;
-            swordGroup.add(blade);
+            // ด้านในหู
+            const innerEarGeo = new THREE.ConeGeometry(0.14, 0.3, 16);
+            const leftInnerEar = new THREE.Mesh(innerEarGeo, innerEarMaterial);
+            leftInnerEar.position.set(0.32, 0.94, 0.88);
+            leftInnerEar.rotation.set(-0.2, 0, -0.2);
+            catGroup.add(leftInnerEar);
 
-            // 6.2 กระบังมือ (Guard)
-            const guardGeo = new THREE.BoxGeometry(0.8, 0.15, 0.2);
-            const guard = new THREE.Mesh(guardGeo, goldMaterial);
-            guard.position.y = 0;
-            swordGroup.add(guard);
+            const rightInnerEar = leftInnerEar.clone();
+            rightInnerEar.position.x = -0.32;
+            rightInnerEar.rotation.z = 0.2;
+            catGroup.add(rightInnerEar);
 
-            // 6.3 ด้ามจับ (Hilt/Handle)
-            const handleGeo = new THREE.CylinderGeometry(0.06, 0.07, 1.0, 16);
-            const handle = new THREE.Mesh(handleGeo, handleMaterial);
-            handle.position.y = -0.55;
-            swordGroup.add(handle);
+            // 6.4 ตาแมว (Eyes)
+            const eyeGeo = new THREE.SphereGeometry(0.09, 16, 16);
+            const leftEye = new THREE.Mesh(eyeGeo, eyeMaterial);
+            leftEye.position.set(0.22, 0.48, 1.48);
+            catGroup.add(leftEye);
 
-            // 6.4 หัวด้ามจับ (Pommel)
-            const pommelGeo = new THREE.SphereGeometry(0.12, 16, 16);
-            const pommel = new THREE.Mesh(pommelGeo, goldMaterial);
-            pommel.position.y = -1.1;
-            swordGroup.add(pommel);
+            const rightEye = leftEye.clone();
+            rightEye.position.x = -0.22;
+            catGroup.add(rightEye);
 
-            // ปรับมุมตั้งต้นให้กระบี่เอียงสวยงาม
-            swordGroup.rotation.z = -Math.PI / 4;
-            return swordGroup;
+            // จมูก (Nose)
+            const noseGeo = new THREE.SphereGeometry(0.05, 16, 16);
+            const nose = new THREE.Mesh(noseGeo, noseMaterial);
+            nose.position.set(0, 0.38, 1.53);
+            catGroup.add(nose);
+
+            // 6.5 ขาหน้า-ขาหลัง (Paws)
+            const pawGeo = new THREE.SphereGeometry(0.2, 16, 16);
+            pawGeo.scale(0.8, 1.2, 0.8);
+
+            const FLPaw = new THREE.Mesh(pawGeo, furMaterial);
+            FLPaw.position.set(0.4, -0.5, 0.6);
+            catGroup.add(FLPaw);
+
+            const FRPaw = FLPaw.clone();
+            FRPaw.position.x = -0.4;
+            catGroup.add(FRPaw);
+
+            const BLPaw = FLPaw.clone();
+            BLPaw.position.set(0.45, -0.4, -0.6);
+            catGroup.add(BLPaw);
+
+            const BRPaw = BLPaw.clone();
+            BRPaw.position.x = -0.45;
+            catGroup.add(BRPaw);
+
+            // 6.6 หางแมว (Tail)
+            const tailGeo = new THREE.CylinderGeometry(0.06, 0.04, 1.2, 16);
+            tailGeo.translate(0, 0.6, 0); // ตั้งจุดหมุนที่โคนหาง
+            tailMesh = new THREE.Mesh(tailGeo, furMaterial);
+            tailMesh.position.set(0, 0, -1.1);
+            tailMesh.rotation.x = -Math.PI / 3;
+            catGroup.add(tailMesh);
+
+            return catGroup;
         }
 
-        const sword = createSword();
-        scene.add(sword);
+        const cat = createCat();
+        scene.add(cat);
 
-        // 7. สร้างอนุภาคแสงรอบๆ กระบี่ (Magic Particles)
-        const particleCount = 150;
+        // 7. อนุภาคแสงดาวรอบตัวแมว (Magic Particles)
+        const particleCount = 200;
         const particleGeo = new THREE.BufferGeometry();
         const particlePos = new Float32Array(particleCount * 3);
 
         for (let i = 0; i < particleCount * 3; i += 3) {
-            particlePos[i] = (Math.random() - 0.5) * 15;
-            particlePos[i + 1] = (Math.random() - 0.5) * 15;
-            particlePos[i + 2] = (Math.random() - 0.5) * 15;
+            particlePos[i] = (Math.random() - 0.5) * 16;
+            particlePos[i + 1] = (Math.random() - 0.5) * 16;
+            particlePos[i + 2] = (Math.random() - 0.5) * 16;
         }
 
         particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePos, 3));
         const particleMat = new THREE.PointsMaterial({
-            color: 0x00ffff,
-            size: 0.08,
+            color: 0xffbe0b,
+            size: 0.09,
             transparent: true,
-            opacity: 0.7,
+            opacity: 0.8,
             blending: THREE.AdditiveBlending
         });
         const particles = new THREE.Points(particleGeo, particleMat);
         scene.add(particles);
 
-        // 8. Grid Helper และ Ring อักขระเวทมนตร์ใต้พื้น
-        const grid = new THREE.GridHelper(20, 20, 0x00f0ff, 0x112244);
+        // 8. Grid Helper พื้นหลัง
+        const grid = new THREE.GridHelper(20, 20, 0xffa500, 0x331144);
         grid.position.y = -3;
         scene.add(grid);
 
-        // 9. Interactive - ระบบคลิกกระบี่ (Raycasting)
+        // 9. Interactive - ระบบคลิกตัวแมว (Raycasting)
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
-        let isSpinningFast = false;
+        let isSuperSpeed = false;
 
         window.addEventListener('click', (event) => {
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
             raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects(sword.children);
+            const intersects = raycaster.intersectObjects(cat.children);
 
             if (intersects.length > 0) {
-                // เอฟเฟกต์เมื่อคลิกโดนกระบี่
-                isSpinningFast = true;
-                swordLight.intensity = 15;
-                swordLight.color.setHex(0xff0055); // เปลี่ยนเป็นสีชมพูเรืองแสงชั่วคราว
+                // คลิกโดนแมว -> แมวเร่งสปีดควงสว่าง + เปลี่ยนสีแสงเรือง
+                isSuperSpeed = true;
+                catLight.intensity = 12;
+                catLight.color.setHex(0xff0077);
                 
                 setTimeout(() => {
-                    isSpinningFast = false;
-                    swordLight.intensity = 3;
-                    swordLight.color.setHex(0x00f0ff);
-                }, 1200);
+                    isSuperSpeed = false;
+                    catLight.intensity = 3;
+                    catLight.color.setHex(0xffaa00);
+                }, 1500);
             }
         });
 
@@ -247,26 +280,35 @@
             requestAnimationFrame(animate);
 
             const elapsedTime = clock.getElapsedTime();
+            const speed = isSuperSpeed ? 4 : 1.2;
 
-            // อัปเดตตำแหน่งกระบี่ให้บินหมุนวนไปมาเป็นคลื่น (Floating & Flying Path)
-            const radius = 2.5;
-            const speed = isSpinningFast ? 4 : 1;
+            // 11.1 เส้นทางบินของน้องแมว (Trajectory)
+            const radius = 2.8;
+            cat.position.x = Math.sin(elapsedTime * speed) * radius;
+            cat.position.y = Math.sin(elapsedTime * 2.5 * speed) * 0.6 + 0.5;
+            cat.position.z = Math.cos(elapsedTime * speed) * radius;
 
-            sword.position.x = Math.sin(elapsedTime * speed) * radius;
-            sword.position.y = Math.sin(elapsedTime * 2 * speed) * 0.8 + 0.5;
-            sword.position.z = Math.cos(elapsedTime * speed) * radius;
+            // 11.2 หมุนลำตัวตามทิศทางการบิน
+            cat.rotation.y = elapsedTime * speed + Math.PI / 2;
+            cat.rotation.z = Math.sin(elapsedTime * 3) * 0.15; // เอียงตัวตามจังหวะบิน
+            
+            if (isSuperSpeed) {
+                cat.rotation.x += 0.3; // หมุนม้วนหน้าควงสว่าน
+            } else {
+                cat.rotation.x = 0;
+            }
 
-            // หมุนตัวกระบี่ตลอดเวลา
-            sword.rotation.y += isSpinningFast ? 0.3 : 0.02;
-            sword.rotation.x = Math.sin(elapsedTime * 2) * 0.2;
+            // 11.3 สบัดหางแมวตามเวลา
+            if (tailMesh) {
+                tailMesh.rotation.z = Math.sin(elapsedTime * 6) * 0.3;
+            }
 
-            // ให้แสงติดไปกับตัวกระบี่
-            swordLight.position.copy(sword.position);
+            // แสงติดไปกับตัวแมว
+            catLight.position.copy(cat.position);
 
             // หมุนอนุภาคแสงรอบๆ
-            particles.rotation.y = elapsedTime * 0.05;
+            particles.rotation.y = elapsedTime * 0.08;
 
-            // อัปเดต Controls และ Render
             controls.update();
             renderer.render(scene, camera);
         };
